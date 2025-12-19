@@ -1,7 +1,7 @@
 #include "esp32-wifi-manager.h"
 #include <WiFi.h>
 
-void ESP32WiFiManager::printMAC() {
+void RoamingWifiManager::printMAC() {
     uint8_t mac[6];
 
     WiFi.mode(WIFI_STA);
@@ -9,6 +9,6 @@ void ESP32WiFiManager::printMAC() {
     Serial.printf("ESP32 WiFi MAC Address: %s\n", WiFi.macAddress().c_str());
 }
 
-void ESP32WiFiManager::init(String ssid, String password) {
+void RoamingWifiManager::init(String ssid, String password) {
 
 }
