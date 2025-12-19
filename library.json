@@ -1,8 +1,8 @@
 {
-  "name": "esp32-wifi-manager",
+  "name": "roaming-wifi-manager",
   "version": "0.0.1",
-  "description": "Wifi connectivity manager aimed for iotroam networks at university, supporting roaming",
-  "keywords": "wifi, esp32, roaming",
+  "description": "Wifi connectivity manager aimed for mesh wifi networks at university, supporting roaming",
+  "keywords": "wifi, mesh, esp32, roaming",
   "repository":
   {
     "type": "git",
