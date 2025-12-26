@@ -1,0 +1,8 @@
+{
+    "instructions": "This JSON file maps BSSID (MAC addresses of access points) to aliases.",
+    "aliases":
+    {
+    "84:16:F9:2A:7C:01": "Miklavec home, Sezana, Slovenia",
+    "84:16:F9:2A:7C:02": "Vincent mobile"
+    }
+}
