@@ -1,0 +1,1332 @@
+#pragma once
+#include <String.h>
+
+
+const String html = R"MyString(
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Roaming WiFi Manager</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #0f1115; color: #e6e6e6; }
+        .container { max-width: 800px; margin: 0 auto; background: #171a21; padding: 20px; border-radius: 10px; box-shadow: 0 2px 14px rgba(0,0,0,0.6); }
+        .status-grid { display: grid; grid-template-columns: auto 1fr; gap: 10px; margin: 20px 0; }
+        .status-label { font-weight: bold; color: #f0f0f0; }
+
+        .status-indicator { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; vertical-align: middle; background: #999; }
+        .status-indicator.connected { background: #28a745; }
+        .status-indicator.checking { background: #fd7e14; }
+        .status-indicator.disconnected { background: #dc3545; }
+
+        .button { background: #007bff; color: white; border: none; padding: 10px 20px; margin: 5px; border-radius: 5px; cursor: pointer; }
+        .button:hover { background: #0056b3; }
+        .button:disabled { background: #3a3f4a; color: #a8acb3; cursor: not-allowed; }
+        .networks { margin-top: 20px; }
+        .network-item { background: #1d212b; border: 1px solid #2a2f3a; margin: 5px 0; padding: 10px; border-radius: 5px; }
+        .networks-table { width: 100%; border-collapse: collapse; }
+        .networks-table th, .networks-table td { border: 1px solid #2a2f3a; padding: 8px; }
+        .networks-table th { background: #222736; text-align: left; }
+        .networks-table tr:nth-child(even) { background: #1b1f2a; }
+        .sortable { cursor: pointer; user-select: none; }
+        .sort-indicator { margin-left: 4px; color: #b9bec7; }
+        .connected-row { background: #102019 !important; }
+        .connected-row td { border-left: 4px solid #28a745; }
+        .known-row td { border-left: 4px solid #007bff; }
+        .unknown-row td { border-left: 4px solid #b9bec7; }
+        .not-detected-row td { color: #6c717b; }
+        .loading { color: #b9bec7; font-style: italic; }
+
+        .actions { margin: 8px 0; }
+
+        .settings-panel { margin: 20px 0; padding: 15px; background: #1d212b; border-radius: 5px; border: 1px solid #2a2f3a; }
+        .settings-panel .settings-row { margin-top: 12px; display: flex; align-items: center; gap: 10px; }
+        .settings-panel .settings-row:first-child { margin-top: 0; }
+        .settings-label { min-width: 210px; }
+        .settings-checkbox { margin-right: 10px; }
+        .settings-number { width: 100px; }
+
+        .settings-radio-label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+        .settings-radio { accent-color: #007bff; }
+
+        input.settings-number { background: #0f1115; color: #e6e6e6; border: 1px solid #2a2f3a; border-radius: 4px; padding: 6px 8px; }
+        input.settings-checkbox { accent-color: #007bff; }
+
+        .section-spacer { margin-top: 40px; }
+        .info-line { margin: 8px 0; color: #b9bec7; }
+
+        .signal-graph { margin: 12px 0 16px 0; padding: 10px; background: #1d212b; border: 1px solid #2a2f3a; border-radius: 5px; }
+        .signal-graph .signal-title { font-weight: bold; color: #f0f0f0; margin-bottom: 10px; }
+        .signal-canvas { display: block; width: 100%; height: 220px; background: #0f1115; border: 1px solid #2a2f3a; border-radius: 5px; }
+        .table-button { padding: 6px 12px; margin: 0; }
+        .signal-controls { display: flex; align-items: center; gap: 10px; margin-top: 6px; color: #b9bec7; }
+        .signal-controls input.settings-number { width: 80px; }
+        .known-list { margin-top: 10px; color: #b9bec7; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Roaming WiFi Manager</h1>
+        
+        <h2>WiFi Status</h2>
+        <div class="status-grid" id="status">
+            <div class="loading">Loading status...</div>
+        </div>
+        
+        <div class="actions">
+            <button class="button" onclick="refreshStatusAndNetworks()">Refresh Status/Networks</button>
+            <button class="button" onclick="scanNetworks()" id="scanBtn">Full Scan Networks</button>
+            <button class="button" onclick="quickScanNetworks()" id="quickScanBtn">Quick scan existing networks</button>
+            <button class="button" onclick="disconnectWifi()">Disconnect</button>
+            <button class="button" onclick="logout()">Logout</button>
+            <button class="button" onclick="restoreDefaults()">Restore default</button>
+        </div>
+
+        <div class="settings-panel">
+            <div class="settings-row">
+                <input class="settings-checkbox" type="checkbox" id="autoFullScanToggle" onchange="updateAutoScanSetting()">
+                <span class="settings-label">Enable automatic full network scanning. Interval:</span>
+                <input class="settings-number" type="number" id="autoFullScanInterval" min="0.1" max="3600" step="0.1" value="10" onchange="updateAutoScanSetting()">
+                <span>sec</span>
+            </div>
+
+            <div class="settings-row">
+                <input class="settings-checkbox" type="checkbox" id="autoRescanKnownToggle" onchange="updateAutoScanSetting()">
+                <span class="settings-label">Enable automatic re-scanning of existing networks. Interval:</span>
+                <input class="settings-number" type="number" id="autoRescanKnownInterval" min="0.1" max="3600" step="0.1" value="15" onchange="updateAutoScanSetting()">
+                <span>sec</span>
+                <input class="settings-checkbox" type="checkbox" id="autoRescanKnownOnlyToggle" onchange="updateAutoScanSetting()">
+                <span>Known networks only</span>
+                <input class="settings-checkbox" type="checkbox" id="autoRescanTestChannelsToggle" onchange="updateAutoScanSetting()">
+                <span>Radar scan</span>
+            </div>
+
+            <div class="settings-row">
+                <input class="settings-checkbox" type="checkbox" id="statusAutoRefreshEnabledToggle" onchange="updateStatusAutoRefreshEnabled()">
+                <span class="settings-label">Auto-refresh status and networks interval:</span>
+                <input class="settings-number" type="number" id="statusAutoRefreshInterval" min="0.1" max="3600" step="0.1" value="0.5" onchange="updateStatusAutoRefreshInterval()">
+                <span>sec</span>
+            </div>
+
+            <div class="settings-row">
+                <input class="settings-checkbox" type="checkbox" id="autoReconnectToggle" onchange="updateAutoReconnectSetting()">
+                <span class="settings-label">If disconnected, auto-reconnect to strongest known network. Interval:</span>
+                <input class="settings-number" type="number" id="autoReconnectInterval" min="0.1" max="3600" step="0.1" value="5" onchange="updateAutoReconnectSetting()">
+                <span>sec</span>
+            </div>
+
+            <div class="settings-row">
+                <input class="settings-checkbox" type="checkbox" id="autoRoamToggle" onchange="updateAutoRoamSetting()">
+                <span class="settings-label">Auto-roam to stronger network, minimum delta RSSI:</span>
+                <input class="settings-number" type="number" id="autoRoamDeltaRssi" min="1" max="50" step="1" value="10" onchange="updateAutoRoamSetting()">
+                <span>dBm</span>
+                <input class="settings-checkbox" type="checkbox" id="autoRoamSameSsidToggle" onchange="updateAutoRoamSetting()">
+                <span>Same SSID only</span>
+            </div>
+
+            <div class="settings-row">
+                <span class="settings-label">Serial debug output level (requires Serial Monitor at 115200 baud):</span>
+                <select class="settings-number" id="debugLevelSelect" onchange="updateDebugLevel()" style="width: 120px;">
+                    <option value="0">0 (None)</option>
+                    <option value="1">1 (Low)</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                    <option value="5">5 (Max)</option>
+                </select>
+            </div>
+        </div>
+
+        <h2 class="section-spacer">Visible Networks</h2>
+        <div class="info-line" id="networksScanInfo">
+            Networks last scanned (sec ago): <span id="networksScanAgeSecValue">N/A</span>
+            &nbsp;|&nbsp;
+            Scan count: <span id="networksScanCountValue">N/A</span>
+        </div>
+
+        <div class="signal-graph">
+            <div class="signal-title">Signal strength (over time)</div>
+            <div class="signal-controls">
+                <label><input class="settings-checkbox" type="checkbox" id="plotKnownOnlyToggle" onchange="togglePlotKnownOnly()" checked> Plot known networks only</label>
+                <span>|</span>
+                <span>History window:</span>
+                <input class="settings-number" type="number" id="signalHistoryWindowMinutes" min="0.1" max="120" step="0.1" value="2" onchange="updateSignalHistoryWindow()">
+                <span>min</span>
+            </div>
+            <canvas id="signalCanvas" class="signal-canvas"></canvas>
+        </div>
+
+        <div class="networks" id="networks">
+            <div class="loading">Loading visible networks...</div>
+        </div>
+    </div>
+
+    <script>
+        // Track current connection for highlighting
+        let currentBSSID = null;
+        let currentChannel = null;
+        let currentSSID = null;
+
+        // Optional: map BSSID -> human-friendly alias
+        let bssidAliasesUrl = null;
+        let bssidAliasesFetchInFlight = null;
+        let bssidAliasMap = new Map(); // lowercased bssid -> alias
+
+        // Helper to make fetch requests (browser handles authentication automatically)
+        function authenticatedFetch(url, options = {}) {
+            return fetch(url, options);
+        }
+
+        function normalizeBssid(bssid) {
+            return String(bssid || '').trim().toLowerCase();
+        }
+        function connectToNetwork(ssid, bssid, channel) {
+            const target = {
+                ssid: String(ssid || ''),
+                bssid: String(bssid || ''),
+                channel: Number(channel || 0)
+            };
+
+            if (!target.ssid.length) {
+                // Silent no-op if SSID missing
+                return;
+            }
+
+            authenticatedFetch('/wifi/connectTarget', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(target)
+            }).catch(() => { /* ignore errors silently */ });
+
+            // Silent status refresh shortly after request
+            setTimeout(refreshStatus, 5000);
+        }
+
+        function getBssidAlias(bssid) {
+            const raw = String(bssid || '').trim();
+            if (!raw) return '';
+            const key = normalizeBssid(raw);
+            return String(bssidAliasMap.get(key) || '').trim();
+        }
+
+        function setBssidAliasesUrlFromServer(url) {
+            const v = (url == null) ? '' : String(url).trim();
+            const newUrl = v.length ? v : null;
+            if (newUrl === bssidAliasesUrl) return;
+            bssidAliasesUrl = newUrl;
+            bssidAliasMap = new Map();
+            fetchBssidAliasesIfConfigured();
+        }
+
+        function fetchBssidAliasesIfConfigured() {
+            if (!bssidAliasesUrl) return;
+            if (bssidAliasesFetchInFlight) return;
+
+            bssidAliasesFetchInFlight = authenticatedFetch(bssidAliasesUrl, { cache: 'no-store' })
+                .then(r => r.json())
+                .then(doc => {
+                    const aliases = (doc && doc.aliases && typeof doc.aliases === 'object') ? doc.aliases : null;
+                    if (!aliases) return;
+
+                    const m = new Map();
+                    for (const [k, v] of Object.entries(aliases)) {
+                        const key = normalizeBssid(k);
+                        if (!key) continue;
+                        const alias = String(v || '').trim();
+                        if (!alias) continue;
+                        m.set(key, alias);
+                    }
+                    bssidAliasMap = m;
+
+                    // Re-render now that aliases may be available.
+                    refreshStatus();
+                    renderNetworksTable();
+                })
+                .catch(() => {
+                    // Ignore; keep showing raw BSSID.
+                })
+                .finally(() => {
+                    bssidAliasesFetchInFlight = null;
+                });
+        }
+
+        // Signal history for line graph (keyed by BSSID)
+        const signalHistory = new Map();
+        let signalHistoryWindowMs = 120000; // default: keep last 2 minutes
+        let plotKnownOnly = true;
+
+        // localStorage keys for graph settings
+        const STORAGE_KEY_PLOT_KNOWN = 'rw_plotKnownOnly';
+        const STORAGE_KEY_SIGNAL_WINDOW_MIN = 'rw_signalWindowMinutes';
+
+        // Status refresh age (seconds since /wifi/status was last refreshed)
+        let statusRefreshAgeSeconds = null;
+        let statusRefreshAgeTimer = null;
+
+        // Auto-refresh status interval (seconds)
+        let statusAutoRefreshIntervalSec = 0.5;
+        let statusAutoRefreshTimer = null;
+        let statusAutoRefreshEnabled = true;
+
+        function clampIntervalSec(value, fallback) {
+            const n = Number(value);
+            if (!Number.isFinite(n)) return fallback;
+            // Keep 0.1s resolution to match input step.
+            const v = Math.round(n * 10) / 10;
+            return Math.max(0.1, Math.min(3600, v));
+        }
+
+        function setStatusAutoRefreshEnabledFromServer(enabled) {
+            const v = !!enabled;
+            statusAutoRefreshEnabled = v;
+            const toggle = document.getElementById('statusAutoRefreshEnabledToggle');
+            if (toggle) toggle.checked = v;
+            restartStatusAutoRefreshTimer();
+        }
+
+        function updateStatusAutoRefreshEnabled() {
+            const toggle = document.getElementById('statusAutoRefreshEnabledToggle');
+            const enabled = toggle ? !!toggle.checked : true;
+            statusAutoRefreshEnabled = enabled;
+            restartStatusAutoRefreshTimer();
+
+            authenticatedFetch('/wifi/statusAutoRefreshEnabled', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enabled: enabled })
+            })
+            .then(response => response.json())
+            .then(data => {
+                setStatusAutoRefreshEnabledFromServer(data.enabled ?? enabled);
+            })
+            .catch(() => {
+                setStatusAutoRefreshEnabledFromServer(enabled);
+            });
+        }
+
+        function setAutoReconnectFromServer(enabled, intervalSec) {
+            const toggle = document.getElementById('autoReconnectToggle');
+            const input = document.getElementById('autoReconnectInterval');
+            if (toggle) toggle.checked = !!enabled;
+            const v = clampIntervalSec(intervalSec, 5);
+            if (input) input.value = String(v);
+        }
+
+        function setAutoRoamFromServer(enabled, deltaDbm, sameSsidOnly) {
+            const toggle = document.getElementById('autoRoamToggle');
+            const deltaInput = document.getElementById('autoRoamDeltaRssi');
+            const sameToggle = document.getElementById('autoRoamSameSsidToggle');
+            if (toggle) toggle.checked = !!enabled;
+            const d = Number(deltaDbm);
+            const v = (Number.isFinite(d) ? Math.max(1, Math.min(50, Math.round(d))) : 10);
+            if (deltaInput) deltaInput.value = String(v);
+            if (sameToggle) sameToggle.checked = !!sameSsidOnly;
+        }
+
+        function setDebugLevelFromServer(level) {
+            const select = document.getElementById('debugLevelSelect');
+            if (select) {
+                const l = Number(level);
+                select.value = (Number.isFinite(l) && l >= 0 && l <= 5) ? String(l) : '0';
+            }
+        }
+
+        function updateDebugLevel() {
+            const select = document.getElementById('debugLevelSelect');
+            if (!select) return;
+            const level = Number(select.value);
+            if (!Number.isFinite(level) || level < 0 || level > 5) return;
+
+            authenticatedFetch('/wifi/debugLevel', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ level: level })
+            })
+            .then(response => response.json())
+            .then(data => {
+                setDebugLevelFromServer(data.level ?? level);
+            })
+            .catch(() => {
+                setDebugLevelFromServer(level);
+            });
+        }
+
+        function updateAutoReconnectSetting() {
+            const toggle = document.getElementById('autoReconnectToggle');
+            const input = document.getElementById('autoReconnectInterval');
+            if (!toggle || !input) return;
+            const enabled = !!toggle.checked;
+            const intervalSec = clampIntervalSec(input.value, 5);
+            input.value = String(intervalSec);
+
+            authenticatedFetch('/wifi/autoreconnect', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enabled: enabled, intervalSec: intervalSec })
+            })
+            .then(response => response.json())
+            .then(data => {
+                setAutoReconnectFromServer(data.enabled ?? enabled, data.intervalSec ?? intervalSec);
+            })
+            .catch(() => {
+                setAutoReconnectFromServer(enabled, intervalSec);
+            });
+        }
+
+        function updateAutoRoamSetting() {
+            const toggle = document.getElementById('autoRoamToggle');
+            const deltaInput = document.getElementById('autoRoamDeltaRssi');
+            const sameToggle = document.getElementById('autoRoamSameSsidToggle');
+            if (!toggle || !deltaInput || !sameToggle) return;
+            const enabled = !!toggle.checked;
+            const raw = Number(deltaInput.value);
+            const deltaDbm = Number.isFinite(raw) ? Math.max(1, Math.min(50, Math.round(raw))) : 10;
+            deltaInput.value = String(deltaDbm);
+            const sameSsidOnly = !!sameToggle.checked;
+
+            authenticatedFetch('/wifi/autoRoam', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enabled: enabled, deltaDbm: deltaDbm, sameSsidOnly: sameSsidOnly })
+            })
+            .then(response => response.json())
+            .then(data => {
+                setAutoRoamFromServer(data.enabled ?? enabled, data.deltaDbm ?? deltaDbm, data.sameSsidOnly ?? sameSsidOnly);
+            })
+            .catch(() => {
+                setAutoRoamFromServer(enabled, deltaDbm, sameSsidOnly);
+            });
+        }
+
+        function disconnectWifi() {
+            authenticatedFetch('/wifi/disconnect', { method: 'POST' })
+                .then(() => refreshStatus())
+                .catch(() => refreshStatus());
+        }
+
+        function logout() {
+            // Clear cached credentials by requesting with invalid auth
+            // This triggers browser to forget the credentials
+            fetch('/wifi/status', {
+                method: 'GET',
+                headers: {
+                    'Authorization': 'Basic ' + btoa('invalid:invalid')
+                }
+            }).then(() => {
+                // Force reload to trigger new authentication prompt
+                window.location.reload();
+            }).catch(() => {
+                // Force reload even on error
+                window.location.reload();
+            });
+        }
+
+        // Networks scan age (seconds since last scan results were captured)
+        let networksScanAgeSeconds = null;
+        let networksScanAgeTimer = null;
+        let networksScanCount = null;
+        let networksScanType = null;
+        let lastSignalHistoryScanCount = null;
+
+        // Full-scan UI gating: keep the button disabled until we receive a fresh
+        // full-scan networks packet (scanType=="full" and scanCount increases) or timeout.
+        let pendingFullScan = null; // { baselineScanCount: number, deadlineMs: number }
+        const fullScanUiTimeoutMs = 15000;
+
+        function normalizeScanCount(value) {
+            const n = Number(value);
+            if (!Number.isFinite(n) || n < 0) return null;
+            return Math.floor(n);
+        }
+
+        function renderNetworksScanAge() {
+            const el = document.getElementById('networksScanAgeSecValue');
+            if (!el) return;
+            el.textContent = (networksScanAgeSeconds == null) ? 'N/A' : String(networksScanAgeSeconds);
+        }
+
+        function renderNetworksScanCount() {
+            const el = document.getElementById('networksScanCountValue');
+            if (!el) return;
+            el.textContent = (networksScanCount == null) ? 'N/A' : String(networksScanCount);
+        }
+
+        function startNetworksScanAgeTimer() {
+            if (networksScanAgeTimer) return;
+            networksScanAgeTimer = setInterval(() => {
+                if (networksScanAgeSeconds == null) return;
+                networksScanAgeSeconds += 1;
+                renderNetworksScanAge();
+            }, 1000);
+        }
+
+        function setNetworksScanAgeFromServer(ageSec) {
+            const n = Number(ageSec);
+            if (!Number.isFinite(n) || n < 0) {
+                networksScanAgeSeconds = null;
+            } else {
+                networksScanAgeSeconds = Math.max(0, Math.floor(n));
+            }
+            renderNetworksScanAge();
+            startNetworksScanAgeTimer();
+        }
+
+        function setNetworksScanCountFromServer(count) {
+            networksScanCount = normalizeScanCount(count);
+            renderNetworksScanCount();
+        }
+
+        function setNetworksScanTypeFromServer(type) {
+            const v = String(type || '').trim();
+            networksScanType = v.length ? v : null;
+        }
+
+        function restartStatusAutoRefreshTimer() {
+            if (statusAutoRefreshTimer) {
+                clearInterval(statusAutoRefreshTimer);
+                statusAutoRefreshTimer = null;
+            }
+
+            if (!statusAutoRefreshEnabled) {
+                return;
+            }
+
+            // Reset the status refresh age counter whenever we (re)start auto-refresh.
+            statusRefreshAgeSeconds = 0;
+            startStatusRefreshAgeTimer();
+            renderStatusRefreshAge();
+
+            const ms = Math.max(1, Math.round(statusAutoRefreshIntervalSec * 1000));
+            statusAutoRefreshTimer = setInterval(() => {
+                refreshStatus();
+                getNetworks();
+            }, ms);
+        }
+
+        function setStatusAutoRefreshIntervalFromServer(intervalSec) {
+            const v = clampIntervalSec(intervalSec, statusAutoRefreshIntervalSec);
+            statusAutoRefreshIntervalSec = v;
+            const input = document.getElementById('statusAutoRefreshInterval');
+            if (input) input.value = String(v);
+            restartStatusAutoRefreshTimer();
+        }
+
+        function updateStatusAutoRefreshInterval() {
+            const input = document.getElementById('statusAutoRefreshInterval');
+            if (!input) return;
+            const intervalSec = clampIntervalSec(input.value, 10);
+            input.value = String(intervalSec);
+
+            authenticatedFetch('/wifi/statusRefreshInterval', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ intervalSec: intervalSec })
+            })
+            .then(response => response.json())
+            .then(data => {
+                setStatusAutoRefreshIntervalFromServer(data.intervalSec ?? intervalSec);
+            })
+            .catch(() => {
+                // Keep local value if server update fails.
+                setStatusAutoRefreshIntervalFromServer(intervalSec);
+            });
+        }
+
+        function renderStatusRefreshAge() {
+            const el = document.getElementById('statusRefreshAgeSecValue');
+            if (!el) return;
+            el.textContent = (statusRefreshAgeSeconds == null) ? 'N/A' : String(statusRefreshAgeSeconds);
+        }
+
+        function startStatusRefreshAgeTimer() {
+            if (statusRefreshAgeTimer) return;
+            statusRefreshAgeTimer = setInterval(() => {
+                if (statusRefreshAgeSeconds == null) return;
+                statusRefreshAgeSeconds += 1;
+                renderStatusRefreshAge();
+            }, 1000);
+        }
+
+        function setConnectionUi(state) {
+            const valueEl = document.getElementById('connectionValue');
+            if (valueEl) valueEl.textContent = state;
+
+            const indicatorEl = document.getElementById('connectionIndicator');
+            if (indicatorEl) {
+                indicatorEl.className = 'status-indicator ' + (
+                    state === 'Connected' ? 'connected' :
+                    'disconnected'
+                );
+                indicatorEl.title = state;
+            }
+        }
+
+        function refreshStatus() {
+            const statusDiv = document.getElementById('status');
+            if (!statusDiv) return;
+
+            renderStatusRefreshAge();
+
+            let completed = false;
+            const timeoutId = setTimeout(() => {
+                if (completed) return;
+                setConnectionUi('Disconnected (timeout)');
+            }, 1500);
+
+            authenticatedFetch('/wifi/status')
+                .then(response => response.json())
+                .then(data => {
+                    completed = true;
+                    clearTimeout(timeoutId);
+
+                    // Reset age on successful refresh.
+                    statusRefreshAgeSeconds = 0;
+                    startStatusRefreshAgeTimer();
+
+                    const bssidAlias = getBssidAlias(data.bssid);
+
+                    statusDiv.innerHTML = `
+                        <div class="status-label">Connection:</div>
+                        <div><span id="connectionIndicator" class="status-indicator"></span><span id="connectionValue">${data.connected ? 'Connected' : 'Disconnected'}</span></div>
+                        <div class="status-label">SSID:</div><div>${data.ssid || 'N/A'}</div>
+                        <div class="status-label">BSSID:</div><div>${data.bssid || 'N/A'}</div>
+                        <div class="status-label">BSSID Alias:</div><div>${bssidAlias || 'N/A'}</div>
+                        <div class="status-label">IP Address:</div><div>${data.ip || 'N/A'}</div>
+                        <div class="status-label">RSSI:</div><div>${data.rssi ? data.rssi + ' dBm' : 'N/A'}</div>
+                        <div class="status-label">MAC Address:</div><div>${data.mac || 'N/A'}</div>
+                        <div class="status-label">Uptime:</div><div>${data.uptime || 'N/A'}</div>
+                        <div class="status-label">Channel:</div><div>${data.channel || 'N/A'}</div>
+                        <div class="status-label">Last radar channel:</div><div>${data.autoRescanTargetChannel != null ? data.autoRescanTargetChannel : 'N/A'}</div>
+                        <div class="status-label">Status refresh age (sec):</div><div id="statusRefreshAgeSecValue">N/A</div>
+                    `;
+
+                    // Re-render because we replaced the whole status grid.
+                    renderStatusRefreshAge();
+
+                    setConnectionUi(data.connected ? 'Connected' : 'Disconnected, data');
+
+                    // Save current connection identifiers (BSSID + channel for precise matching)
+                    currentBSSID = data.bssid || null;
+                    currentChannel = data.channel || null;
+                    currentSSID = data.ssid || null;
+
+                    // Re-draw graph immediately using latest status.
+                    drawSignalGraph();
+
+                    // Always refresh networks after status so highlight has identifiers.
+                })
+                .catch(() => {
+                    completed = true;
+                    clearTimeout(timeoutId);
+                    setConnectionUi('Disconnected, error fetching status');
+
+                    // Even if status fails, still refresh the visible networks list.
+                });
+        }
+
+        function refreshStatusAndNetworks() {
+            refreshStatus();
+            getNetworks();
+        }
+
+        function getSeriesColorForNetwork(net) {
+            const ssid = (net && net.ssid) ? String(net.ssid) : '';
+            const bssid = (net && net.bssid) ? String(net.bssid) : '';
+            const channel = (net && net.channel != null) ? net.channel : null;
+
+            const nb = bssid.toLowerCase();
+            const cb = currentBSSID ? String(currentBSSID).toLowerCase() : '';
+            const matchBssid = nb && cb && (nb === cb);
+            const matchChannel = (channel !== null && currentChannel !== null && channel == currentChannel);
+            const connected = matchBssid && matchChannel;
+            if (connected) return '#28a745';
+
+            const sameSsid = currentSSID && ssid && (String(currentSSID) === ssid);
+            if (sameSsid) return '#102019';
+
+            // Highlight known networks (other than the currently-connected SSID) in blue.
+            const known = !!(net && net.known);
+            const hasDifferentSsid = currentSSID && ssid && (String(currentSSID) !== ssid);
+            if (known && hasDifferentSsid) return '#007bff';
+
+            return '#b9bec7';
+        }
+
+        function pruneSignalHistory(nowMs) {
+            for (const [key, series] of signalHistory.entries()) {
+                const pts = series.points;
+                while (pts.length > 0 && (nowMs - pts[0].t) > signalHistoryWindowMs) {
+                    pts.shift();
+                }
+                // If we pruned away the first point, the new first point cannot have a gap-from-previous.
+                if (pts.length > 0) {
+                    pts[0].gap = false;
+                }
+                if (pts.length === 0) {
+                    signalHistory.delete(key);
+                }
+            }
+        }
+
+        function updateSignalHistoryFromNetworks(nowMs) {
+            if (!networksData || networksData.length === 0) {
+                pruneSignalHistory(nowMs);
+                return;
+            }
+
+            for (const net of networksData) {
+                const isKnown = !!(net && net.known);
+                if (plotKnownOnly && !isKnown) {
+                    continue;
+                }
+                // If the backend reports this entry was not scanned in the last sweep,
+                // do not add a data point (and do not treat it as an undetected gap).
+                // Backward compatible: if the field is missing, assume it was scanned.
+                const scanned = (net && net.scanned != null) ? !!net.scanned : true;
+                if (!scanned) {
+                    continue;
+                }
+
+                const bssid = (net && net.bssid) ? String(net.bssid) : '';
+                if (!bssid) continue; // need stable key
+
+                const rssi = Number(net.rssi);
+                if (!Number.isFinite(rssi)) continue;
+
+                const key = bssid.toLowerCase();
+                let series = signalHistory.get(key);
+                if (!series) {
+                    series = { ssid: (net && net.ssid) ? String(net.ssid) : '', bssid: bssid, points: [], hadGap: false };
+                    signalHistory.set(key, series);
+                } else {
+                    series.ssid = (net && net.ssid) ? String(net.ssid) : series.ssid;
+                    series.bssid = bssid;
+                }
+
+                const detected = !(net && net.detected === false);
+                if (!detected) {
+                    // Do not add a data point for undetected networks.
+                    // If we have at least one prior point, remember there was a gap so the next
+                    // detected point can draw a gray segment from the last detected time.
+                    if (series.points.length > 0) {
+                        series.hadGap = true;
+                    }
+                    continue;
+                }
+
+                const pts = series.points;
+                const last = pts.length > 0 ? pts[pts.length - 1] : null;
+                // Avoid stacking duplicates if polling is faster than 1s.
+                if (!last || (nowMs - last.t) >= 500) {
+                    const gap = !!series.hadGap && pts.length > 0;
+                    pts.push({ t: nowMs, rssi: rssi, gap: gap });
+                    series.hadGap = false;
+                }
+            }
+
+            pruneSignalHistory(nowMs);
+        }
+
+        function drawSignalGraph() {
+            const canvas = document.getElementById('signalCanvas');
+            if (!canvas) return;
+
+            // Resize canvas to match CSS size (for crisp lines)
+            const dpr = window.devicePixelRatio || 1;
+            const cssWidth = Math.max(1, Math.floor(canvas.clientWidth));
+            const cssHeight = Math.max(1, Math.floor(canvas.clientHeight));
+            const desiredW = Math.floor(cssWidth * dpr);
+            const desiredH = Math.floor(cssHeight * dpr);
+            if (canvas.width !== desiredW || canvas.height !== desiredH) {
+                canvas.width = desiredW;
+                canvas.height = desiredH;
+            }
+
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+
+            const nowMs = Date.now();
+            const startMs = nowMs - signalHistoryWindowMs;
+
+            // Background
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#0f1115';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const padL = Math.floor(44 * dpr);
+            const padR = Math.floor(10 * dpr);
+            const padT = Math.floor(10 * dpr);
+            const padB = Math.floor(24 * dpr);
+            const plotW = canvas.width - padL - padR;
+            const plotH = canvas.height - padT - padB;
+
+            if (plotW <= 10 || plotH <= 10) return;
+
+            const minDbm = -100;
+            const maxDbm = -30;
+            const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+            const xForT = (t) => padL + (clamp(t, startMs, nowMs) - startMs) * (plotW / (nowMs - startMs));
+            const yForRssi = (rssi) => {
+                const v = clamp(rssi, minDbm, maxDbm);
+                const frac = (v - minDbm) / (maxDbm - minDbm);
+                return padT + (1 - frac) * plotH;
+            };
+
+            // Grid + axes
+            ctx.strokeStyle = '#2a2f3a';
+            ctx.lineWidth = Math.max(1, Math.floor(1 * dpr));
+
+            const yTicks = [-100, -80, -60, -40];
+            for (const yTick of yTicks) {
+                const y = yForRssi(yTick);
+                ctx.beginPath();
+                ctx.moveTo(padL, y);
+                ctx.lineTo(padL + plotW, y);
+                ctx.stroke();
+
+                ctx.fillStyle = '#b9bec7';
+                ctx.font = `${Math.floor(10 * dpr)}px Arial`;
+                ctx.textAlign = 'right';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(String(yTick), padL - Math.floor(6 * dpr), y);
+            }
+
+            // Time-axis grid lines based on current history window
+            const windowSec = Math.max(1, Math.floor(signalHistoryWindowMs / 1000));
+            // Choose a "nice" step to target ~12 grid lines
+            const niceSteps = [1, 2, 5, 10, 15, 20, 30, 60, 120, 300, 600, 900, 1200, 1800, 3600];
+            const targetLines = 12;
+            const desiredStep = windowSec / targetLines;
+            let stepSec = niceSteps.find(s => s >= desiredStep) || 3600;
+            // Label roughly every 3 grid lines
+            const labelStepSec = stepSec * 3;
+
+            let drewNowTick = false;
+            let drewAnyLabel = false;
+            for (let sec = -windowSec; sec <= 0; sec += stepSec) {
+                const t = nowMs + sec * 1000;
+                const x = xForT(t);
+                ctx.beginPath();
+                ctx.moveTo(x, padT);
+                ctx.lineTo(x, padT + plotH);
+                ctx.stroke();
+
+                // Labels: 'now' and at multiples of labelStepSec
+                const shouldLabel = (sec === 0) || (sec % labelStepSec === 0);
+                if (shouldLabel) {
+                    ctx.fillStyle = '#b9bec7';
+                    ctx.font = `${Math.floor(10 * dpr)}px Arial`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'top';
+                    let label;
+                    if (sec === 0) {
+                        label = 'now';
+                        drewNowTick = true;
+                    } else if (Math.abs(sec) >= 60 && (sec % 60 === 0)) {
+                        label = `-${Math.floor(Math.abs(sec) / 60)}m`;
+                    } else {
+                        label = `${sec}s`;
+                    }
+                    ctx.fillText(label, x, padT + plotH + Math.floor(6 * dpr));
+                    drewAnyLabel = true;
+                }
+            }
+
+            // Ensure a 'now' tick/label is always drawn even if the loop did not land exactly on zero.
+            if (!drewNowTick) {
+                const x = xForT(nowMs);
+                ctx.beginPath();
+                ctx.moveTo(x, padT);
+                ctx.lineTo(x, padT + plotH);
+                ctx.stroke();
+
+                ctx.fillStyle = '#b9bec7';
+                ctx.font = `${Math.floor(10 * dpr)}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'top';
+                ctx.fillText('now', x, padT + plotH + Math.floor(6 * dpr));
+                drewAnyLabel = true;
+            }
+
+            // If somehow no labels were drawn (extreme edge), force a label at start and end
+            if (!drewAnyLabel) {
+                const xStart = xForT(nowMs - signalHistoryWindowMs);
+                const xEnd = xForT(nowMs);
+                ctx.fillStyle = '#b9bec7';
+                ctx.font = `${Math.floor(10 * dpr)}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'top';
+                ctx.fillText(`-${Math.max(1, Math.floor(windowSec / 60))}m`, xStart, padT + plotH + Math.floor(6 * dpr));
+                ctx.fillText('now', xEnd, padT + plotH + Math.floor(6 * dpr));
+            }
+
+            // Determine which series to draw: only those currently in networksData
+            const activeKeys = new Set();
+            if (networksData && networksData.length > 0) {
+                for (const n of networksData) {
+                    const bssid = (n && n.bssid) ? String(n.bssid) : '';
+                    if (!bssid) continue;
+                    if (plotKnownOnly && !(n && n.known)) continue;
+                    activeKeys.add(bssid.toLowerCase());
+                }
+            }
+
+            // Draw series
+            for (const net of (networksData || [])) {
+                const bssid = (net && net.bssid) ? String(net.bssid) : '';
+                if (!bssid) continue;
+                if (plotKnownOnly && !(net && net.known)) continue;
+                const key = bssid.toLowerCase();
+                const series = signalHistory.get(key);
+                if (!series || !series.points || series.points.length < 1) continue;
+
+                const color = getSeriesColorForNetwork(net);
+                const undetectedColor = '#404048';
+                const pointsInWindow = series.points.filter(p => p.t >= startMs);
+                if (pointsInWindow.length === 0) continue;
+
+                // 2+ points: draw line segments.
+                // If there was an undetected gap between points, draw the connecting segment in gray.
+                ctx.lineWidth = Math.max(1, Math.floor(2 * dpr));
+                for (let i = 1; i < pointsInWindow.length; i++) {
+                    const p0 = pointsInWindow[i - 1];
+                    const p1 = pointsInWindow[i];
+                    ctx.strokeStyle = (p1 && p1.gap) ? undetectedColor : color;
+                    ctx.beginPath();
+                    ctx.moveTo(xForT(p0.t), yForRssi(p0.rssi));
+                    ctx.lineTo(xForT(p1.t), yForRssi(p1.rssi));
+                    ctx.stroke();
+                }
+
+                // Add thin dots at each data point only when window <= 10 minutes
+                if (signalHistoryWindowMs <= 600000) {
+                    const dotR = Math.max(1, 1.5 * dpr);
+                    for (const p of pointsInWindow) {
+                        const x = xForT(p.t);
+                        const y = yForRssi(p.rssi);
+                        ctx.fillStyle = color;
+                        ctx.beginPath();
+                        ctx.arc(x, y, dotR, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+            }
+        }
+
+        function setScanButtonsEnabled(enabled) {
+            const fullBtn = document.getElementById('scanBtn');
+            const quickBtn = document.getElementById('quickScanBtn');
+            if (fullBtn) fullBtn.disabled = !enabled;
+            if (quickBtn) quickBtn.disabled = !enabled;
+            if (enabled) {
+                if (fullBtn) fullBtn.textContent = 'Full Scan Networks';
+                if (quickBtn) quickBtn.textContent = 'Quick scan existing networks';
+            }
+        }
+
+        function enableScanButtonsIfAllowed() {
+            // If a full scan is pending, do not enable early.
+            if (pendingFullScan) return;
+            setScanButtonsEnabled(true);
+        }
+
+        function isFreshFullScanReceived(baselineScanCount) {
+            if (networksScanType !== 'full') return false;
+            if (networksScanCount == null) return false;
+            return networksScanCount > baselineScanCount;
+        }
+
+        function pollUntilFullScanComplete() {
+            if (!pendingFullScan) return;
+            const baseline = pendingFullScan.baselineScanCount;
+            const deadlineMs = pendingFullScan.deadlineMs;
+
+            getNetworks().finally(() => {
+                if (!pendingFullScan) return;
+
+                if (isFreshFullScanReceived(baseline)) {
+                    pendingFullScan = null;
+                    setScanButtonsEnabled(true);
+                    return;
+                }
+
+                if (Date.now() >= deadlineMs) {
+                    pendingFullScan = null;
+                    setScanButtonsEnabled(true);
+                    return;
+                }
+
+                setTimeout(pollUntilFullScanComplete, 750);
+            });
+        }
+
+        function startScan(mode) {
+            const fullBtn = document.getElementById('scanBtn');
+            const quickBtn = document.getElementById('quickScanBtn');
+
+            /*
+            setScanButtonsEnabled(false);
+            if (mode === 'complete') {
+                if (fullBtn) fullBtn.textContent = 'Scanning...';
+            } else {
+                if (quickBtn) quickBtn.textContent = 'Quick scanning...';
+            }*/
+
+            authenticatedFetch('/wifi/scan', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mode: mode })
+            })
+                .then(() => {
+                    if (mode === 'complete') {
+                        const baseline = (networksScanCount == null) ? -1 : networksScanCount;
+                        pendingFullScan = { baselineScanCount: baseline, deadlineMs: Date.now() + fullScanUiTimeoutMs };
+                        //pollUntilFullScanComplete();
+                        //setTimeout(getNetworks, 1000);
+                    } else {
+                        // Quick rescan: best-effort refresh after a short delay.
+                        setTimeout(getNetworks, 1000);
+                    }
+                })
+                .catch(() => {
+                    pendingFullScan = null;
+                    setScanButtonsEnabled(true);
+                });
+        }
+
+        function scanNetworks() {
+            startScan('complete');
+        }
+
+        function quickScanNetworks() {
+            startScan('rescan');
+        }
+
+        // Sorting state (default: no sorting, preserve original order)
+        let networksData = [];
+        let sortKey = null;
+        let sortAsc = true;
+
+        function sortBy(key) {
+            if (sortKey === key) {
+                sortAsc = !sortAsc;
+            } else {
+                sortKey = key;
+                // default direction per key: RSSI desc, channel asc, strings asc
+                sortAsc = (key !== 'rssi');
+            }
+            renderNetworksTable();
+        }
+
+        function compareValues(a, b, key, asc) {
+            const va = a[key];
+            const vb = b[key];
+            if (va == null && vb == null) return 0;
+            if (va == null) return asc ? 1 : -1;
+            if (vb == null) return asc ? -1 : 1;
+            if (key === 'known') {
+                const na = va ? 1 : 0;
+                const nb = vb ? 1 : 0;
+                return asc ? (na - nb) : (nb - na);
+            }
+            if (key === 'rssi' || key === 'channel') {
+                return asc ? (va - vb) : (vb - va);
+            }
+            const sa = String(va).toLowerCase();
+            const sb = String(vb).toLowerCase();
+            if (sa < sb) return asc ? -1 : 1;
+            if (sa > sb) return asc ? 1 : -1;
+            return 0;
+        }
+
+        function renderNetworksTable() {
+            const networksDiv = document.getElementById('networks');
+            if (!networksData || networksData.length === 0) {
+                networksDiv.innerHTML = '<div>No networks found</div>';
+                return;
+            }
+            const rowsWithAlias = (networksData || []).map(n => ({
+                ...n,
+                alias: getBssidAlias(n && n.bssid)
+            }));
+            const rows = (sortKey === null) ? rowsWithAlias : [...rowsWithAlias].sort((a, b) => compareValues(a, b, sortKey, sortAsc));
+            const arrow = sortAsc ? '▲' : '▼';
+            const arrowFor = (k) => (sortKey === k ? `<span class="sort-indicator">${arrow}</span>` : '');
+
+            networksDiv.innerHTML = `
+                <table class="networks-table">
+                    <thead>
+                        <tr>
+                            <th class="sortable" onclick="sortBy('ssid')">SSID ${arrowFor('ssid')}</th>
+                            <th class="sortable" onclick="sortBy('known')">Known ${arrowFor('known')}</th>
+                            <th class="sortable" onclick="sortBy('alias')">Alias ${arrowFor('alias')}</th>
+                            <th class="sortable" onclick="sortBy('bssid')">BSSID ${arrowFor('bssid')}</th>
+                            <th class="sortable" onclick="sortBy('rssi')">RSSI (dBm) ${arrowFor('rssi')}</th>
+                            <th class="sortable" onclick="sortBy('channel')">Channel ${arrowFor('channel')}</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rows.map(network => {
+                            // Match only the exact BSSID and channel currently connected
+                            const nb = (network && network.bssid) ? String(network.bssid).toLowerCase() : '';
+                            const cb = currentBSSID ? String(currentBSSID).toLowerCase() : '';
+                            const nc = network ? network.channel : null;
+                            const matchBssid = nb && cb && (nb === cb);
+                            const matchChannel = (nc !== null && currentChannel !== null && nc == currentChannel);
+                            const connected = matchBssid && matchChannel;
+                            const detected = !(network && network.detected === false);
+                            const known = !!(network && network.known);
+                            const baseClass = connected ? 'connected-row' : (known ? 'known-row' : 'unknown-row');
+                            const rowClass = !detected ? `${baseClass} not-detected-row` : baseClass;
+                            const ssidArg = JSON.stringify(network.ssid || '');
+                            const bssidArg = JSON.stringify(network.bssid || '');
+                            const channelArg = Number(network.channel || 0);
+                            return `
+                            <tr class="${rowClass}">
+                                <td>${network.ssid || 'Hidden'}${connected ? ' ✅' : ''}</td>
+                                <td>${known ? 'Yes' : 'No'}</td>
+                                <td>${network.alias || ''}</td>
+                                <td>${network.bssid}</td>
+                                <td>${network.rssi}</td>
+                                <td>${network.channel}</td>
+                                <td><button class="button table-button" onclick='connectToNetwork(${ssidArg}, ${bssidArg}, ${channelArg})' ${connected ? 'disabled' : ''}>Connect</button></td>
+                            </tr>`;
+                        }).join('')}
+                    </tbody>
+                </table>
+                `;
+        }
+
+        function getNetworks() {
+            return authenticatedFetch('/wifi/networks')
+                .then(response => response.json())
+                .then(data => {
+                    const nowMs = Date.now();
+                    setNetworksScanAgeFromServer(data.scanAgeSec);
+                    setNetworksScanCountFromServer(data.scanCount);
+                    setNetworksScanTypeFromServer(data.scanType);
+                    networksData = (data && Array.isArray(data.networks)) ? data.networks : [];
+                    // Reset to default: no sorting, keep original order each fetch
+                    sortKey = null;
+                    sortAsc = true;
+
+                    // Only add a new graph data point when scanCount increases.
+                    // (If scanCount resets, treat as a new session and clear history.)
+                    if (networksScanCount != null) {
+                        if (lastSignalHistoryScanCount != null && networksScanCount < lastSignalHistoryScanCount) {
+                            signalHistory.clear();
+                            lastSignalHistoryScanCount = null;
+                        }
+
+                        if (lastSignalHistoryScanCount == null || networksScanCount > lastSignalHistoryScanCount) {
+                            updateSignalHistoryFromNetworks(nowMs);
+                            lastSignalHistoryScanCount = networksScanCount;
+                        } else {
+                            pruneSignalHistory(nowMs);
+                        }
+                    } else {
+                        pruneSignalHistory(nowMs);
+                    }
+
+                    drawSignalGraph();
+                    renderNetworksTable();
+                    enableScanButtonsIfAllowed();
+                    drawSignalGraph();
+                });
+        }
+
+        function togglePlotKnownOnly() {
+            const toggle = document.getElementById('plotKnownOnlyToggle');
+            plotKnownOnly = !!(toggle && toggle.checked);
+            try { localStorage.setItem(STORAGE_KEY_PLOT_KNOWN, String(plotKnownOnly)); } catch (e) {}
+            drawSignalGraph();
+        }
+
+        function updateSignalHistoryWindow() {
+            const input = document.getElementById('signalHistoryWindowMinutes');
+            if (!input) return;
+            const raw = Number(input.value);
+            const mins = (Number.isFinite(raw) ? Math.max(0.1, Math.min(120.0, Math.round(raw * 10) / 10)) : 2.0);
+            input.value = String(mins);
+            signalHistoryWindowMs = Math.max(6000, Math.round(mins * 60000));
+            try { localStorage.setItem(STORAGE_KEY_SIGNAL_WINDOW_MIN, String(mins)); } catch (e) {}
+            // Prune immediately and re-draw to reflect the new window
+            pruneSignalHistory(Date.now());
+            drawSignalGraph();
+        }
+
+        function connectToStrongest() {
+                authenticatedFetch('/wifi/connect', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    alert(data.message || 'Connection attempt initiated');
+                    setTimeout(refreshStatus, 5000);
+                });
+        }
+
+        function setAutoFullScanFromServer(enabled, intervalSec) {
+            const toggle = document.getElementById('autoFullScanToggle');
+            const input = document.getElementById('autoFullScanInterval');
+            if (toggle) toggle.checked = !!enabled;
+
+            const v = clampIntervalSec(intervalSec, 10);
+            if (input) input.value = String(v);
+        }
+
+        function setAutoRescanKnownFromServer(enabled, intervalSec) {
+            const toggle = document.getElementById('autoRescanKnownToggle');
+            const input = document.getElementById('autoRescanKnownInterval');
+            if (toggle) toggle.checked = !!enabled;
+
+            const v = clampIntervalSec(intervalSec, 1);
+            if (input) input.value = String(v);
+        }
+
+        function setAutoRescanKnownOnlyFromServer(knownOnly) {
+            const toggle = document.getElementById('autoRescanKnownOnlyToggle');
+            if (toggle) toggle.checked = !!knownOnly;
+        }
+
+        function setAutoRescanTestChannelsFromServer(enabled) {
+            const toggle = document.getElementById('autoRescanTestChannelsToggle');
+            if (toggle) toggle.checked = !!enabled;
+        }
+
+        function updateAutoScanSetting() {
+            const fullToggle = document.getElementById('autoFullScanToggle');
+            const fullInput = document.getElementById('autoFullScanInterval');
+            const rescanToggle = document.getElementById('autoRescanKnownToggle');
+            const rescanInput = document.getElementById('autoRescanKnownInterval');
+            const rescanKnownOnlyToggle = document.getElementById('autoRescanKnownOnlyToggle');
+            const rescanTestChannelsToggle = document.getElementById('autoRescanTestChannelsToggle');
+            if (!fullToggle || !fullInput || !rescanToggle || !rescanInput || !rescanKnownOnlyToggle || !rescanTestChannelsToggle) return;
+
+            const fullEnabled = !!fullToggle.checked;
+            const fullIntervalSec = clampIntervalSec(fullInput.value, 15);
+            fullInput.value = String(fullIntervalSec);
+
+            const rescanEnabled = !!rescanToggle.checked;
+            const rescanIntervalSec = clampIntervalSec(rescanInput.value, 15);
+            rescanInput.value = String(rescanIntervalSec);
+
+            const rescanKnownOnly = !!rescanKnownOnlyToggle.checked;
+            const rescanTestChannels = !!rescanTestChannelsToggle.checked;
+
+            authenticatedFetch('/wifi/autoscan', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    fullEnabled: fullEnabled,
+                    fullIntervalSec: fullIntervalSec,
+                    rescanEnabled: rescanEnabled,
+                    rescanIntervalSec: rescanIntervalSec,
+                    rescanKnownOnly: rescanKnownOnly,
+                    rescanTestChannels: rescanTestChannels,
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                setAutoFullScanFromServer(data.fullEnabled ?? fullEnabled, data.fullIntervalSec ?? fullIntervalSec);
+                setAutoRescanKnownFromServer(data.rescanEnabled ?? rescanEnabled, data.rescanIntervalSec ?? rescanIntervalSec);
+                setAutoRescanKnownOnlyFromServer(data.rescanKnownOnly ?? rescanKnownOnly);
+                setAutoRescanTestChannelsFromServer(data.rescanTestChannels ?? rescanTestChannels);
+            })
+            .catch(() => {
+                setAutoFullScanFromServer(fullEnabled, fullIntervalSec);
+                setAutoRescanKnownFromServer(rescanEnabled, rescanIntervalSec);
+                setAutoRescanKnownOnlyFromServer(rescanKnownOnly);
+                setAutoRescanTestChannelsFromServer(rescanTestChannels);
+            });
+        }
+
+        function updateAutoScanToggle() {
+            authenticatedFetch('/wifi/settings')
+                .then(response => response.json())
+                .then(data => {
+                    const fullEnabled = data.autoFullScanEnabled ?? false;
+                    const fullIntervalSec = data.autoFullScanIntervalSec ?? 10;
+                    const rescanEnabled = data.autoRescanKnownEnabled ?? true;
+                    const rescanIntervalSec = data.autoRescanKnownIntervalSec ?? 1;
+                    const rescanKnownOnly = data.autoRescanKnownOnly ?? true;
+                    const rescanTestChannels = data.autoRescanTestChannels ?? true;
+
+                    setAutoFullScanFromServer(fullEnabled, fullIntervalSec);
+                    setAutoRescanKnownFromServer(rescanEnabled, rescanIntervalSec);
+                    setAutoRescanKnownOnlyFromServer(rescanKnownOnly);
+                    setAutoRescanTestChannelsFromServer(rescanTestChannels);
+                    setStatusAutoRefreshIntervalFromServer(data.statusRefreshIntervalSec ?? 0.5);
+                    setStatusAutoRefreshEnabledFromServer(data.statusAutoRefreshEnabled ?? true);
+                    setAutoReconnectFromServer(data.autoReconnectEnabled ?? true, data.autoReconnectIntervalSec ?? 5);
+
+                    setAutoRoamFromServer(
+                        data.autoRoamEnabled ?? true,
+                        data.autoRoamDeltaRssiDbm ?? 10,
+                        data.autoRoamSameSsidOnly ?? true
+                    );
+
+                    setDebugLevelFromServer(data.debugLevel ?? 0);
+
+                    setBssidAliasesUrlFromServer(data.bssidAliasesUrl);
+                });
+        }
+
+        function restoreDefaults() {
+            authenticatedFetch('/wifi/restoreDefaults', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    // Re-apply settings received from server to UI
+                    setAutoFullScanFromServer(data.autoFullScanEnabled ?? false, data.autoFullScanIntervalSec ?? 15);
+                    setAutoRescanKnownFromServer(data.autoRescanKnownEnabled ?? true, data.autoRescanKnownIntervalSec ?? 1);
+                    setAutoRescanKnownOnlyFromServer(data.autoRescanKnownOnly ?? true);
+                    setAutoRescanTestChannelsFromServer(data.autoRescanTestChannels ?? true);
+                    setStatusAutoRefreshIntervalFromServer(data.statusRefreshIntervalSec ?? 0.5);
+                    setStatusAutoRefreshEnabledFromServer(data.statusAutoRefreshEnabled ?? true);
+                    setAutoReconnectFromServer(data.autoReconnectEnabled ?? true, data.autoReconnectIntervalSec ?? 5);
+                    setAutoRoamFromServer(data.autoRoamEnabled ?? true, data.autoRoamDeltaRssiDbm ?? 10, data.autoRoamSameSsidOnly ?? true);
+                    setDebugLevelFromServer(data.debugLevel ?? 0);
+                    setBssidAliasesUrlFromServer(data.bssidAliasesUrl ?? '');
+                    // Optionally refresh status/networks to reflect any changes
+                    refreshStatusAndNetworks();
+                })
+                .catch(() => {
+                    // Fallback: refresh settings from server
+                    updateAutoScanToggle();
+                });
+        }
+
+
+        // Load persisted graph settings from localStorage
+        function loadGraphSettings() {
+            try {
+                const storedPlotKnown = localStorage.getItem(STORAGE_KEY_PLOT_KNOWN);
+                if (storedPlotKnown !== null) {
+                    plotKnownOnly = storedPlotKnown === 'true';
+                    const toggle = document.getElementById('plotKnownOnlyToggle');
+                    if (toggle) toggle.checked = plotKnownOnly;
+                }
+                const storedWindow = localStorage.getItem(STORAGE_KEY_SIGNAL_WINDOW_MIN);
+                if (storedWindow !== null) {
+                    const mins = Number(storedWindow);
+                    if (Number.isFinite(mins) && mins >= 0.1 && mins <= 120.0) {
+                        signalHistoryWindowMs = Math.max(6000, Math.round(mins * 60000));
+                        const input = document.getElementById('signalHistoryWindowMinutes');
+                        if (input) input.value = String(mins);
+                    }
+                }
+            } catch (e) {}
+        }
+
+        // Initial load
+        loadGraphSettings();
+        updateAutoScanToggle();
+        refreshStatusAndNetworks();
+    </script>
+</body>
+</html>
+        )MyString";
+
+String RoamingWiFiManager::serverHtml() {        
+    return html;
+}
