@@ -1,5 +1,4 @@
-#include "Arduino.h"
-#include "roam-wifi.h"
+#include "RoamingWiFiManager.h"
 
 RoamingWiFiManager manager;
 

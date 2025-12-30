@@ -1,44 +1,30 @@
 # roaming-wifi-manager
-Wifi connectivity manager aimed for iotroam networks at university, supporting active roaming. Useful for static and mobile robots
+
+Roaming wifi connectivity manager is aimed for mesh networks such as iotroam at universities.
+Active roaming is supported, making it useful for mobile robots and also for static setups which are carried around inside buildings.
+The manager ensures that the device keeps connected to the strongest access point with the same (or different) SSID, and continuously scans for new access points across the available channels.
+An ESP32 device supporting 5 GHz is required, such as the ESP32-C5 family. The 2.4 GHz band is generally heavily congested in buildings with many access points and therefore not reliable.
+An extensive web interface is available to control scanning and auto-reconnecting options and show the signal strength history of the relevant access points.
 
 ## features
 
-- display mac address to serial so that you can register it at iotroam.nl
-- connect to iotroam with given password
-- use 5 GHz band by default
+- extensive admin panel
 - active roaming: periodically scan networks asynchronously, connecting to a significantly stronger hotspot if available
-- http endpoint at /wifi with status information, available networks and BSSID's, and some other generic data
 - designed for easy integration with other ESP32-C5 projects
-- control LED on ESP32-C5 (official devkit or waveshare) to show wifi status
-
-## options
-Add VIN_DEBUG=3 to build flags to enable outputting debug information to Serial
+- control RGB LED on ESP32-C5 devkit to show wifi status
 
 ## LED color
-- red: boot
-- orange: setup
-- bright orange: scanning networks (synchronously)
-- blue: processing scanned networks
+- white: boot
+- orange: scanning networks (synchronously)
 - orange flashing: connecting to best network
+- blue: processing scanned networks
 - green: connected
-- red: not connected (invalid credentials, access point unreachable or another error)
+- red: not connected
 
-## HTTP endpoints
-
-- /wifi : dashboard (html)
-- /wifi/status : json object with status information
-- /wifi/scan (POST)
-- /wifi/networks : json array with known networks
-- /wifi/connect (POST)
-- /wifi/settings
-- /wifi/autoscan (POST)
-
-
+# supported (recommended) boards
+- ESP32-C5-DevKitC-1 (Espressif)
+- ESP32-C5-WIFI6-KIT-N16R8 (WaveShare)
 
 ## todo
-
-- network scan interval, make it work
-- checkbox to enable/disable auto-switching to other bssid
-- save connection info bssid for quicker reload at next startup
-- consider skipping connection in setup() and (re)connect in loop instead
-- make web graph showing signal strength of connected (green), alternative bssid's at same ssid (dark green), other known networks (dark blue) and unknown networks (gray)
+- test in university building with many access points
+- control which channels are (re-)scanned, which are active and which passive

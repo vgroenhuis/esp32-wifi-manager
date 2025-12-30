@@ -1,9 +1,9 @@
-#include "roam-wifi.h"
+#include "RoamingWiFiManager.h"
 #include <WiFi.h>
 #include <algorithm>
 #include <mbedtls/base64.h>
 
-#include "wifi.html" // contains the WIFI_HTML string
+#include "WiFiPage.html" // contains the WIFI_HTML string
 
 // Runtime debug level control
 #define DBG_PRINT_L(minLevel, ...)  if (RoamingWiFiManager::debugLevel >= (minLevel)) { Serial.print(__VA_ARGS__); }
@@ -42,27 +42,6 @@ bool RoamingWiFiManager::parseBssid(const String& bssidStr, uint8_t bssid[6]) {
         &bssid[0], &bssid[1], &bssid[2], &bssid[3], &bssid[4], &bssid[5]) == 6);
 }
 
-/*
-RoamingWiFiManager::ScanPurpose RoamingWiFiManager::fromString(String s) {
-    if (s == "none") {
-        return ScanPurpose::None;
-    }
-    if (s == "manualFull") {
-        return ScanPurpose::ManualFull;
-    }
-    if (s == "autoFull") {
-        return ScanPurpose::AutoFull;
-    }
-    if (s == "autoRescanSingle") {
-        return ScanPurpose::AutoRescanSingle;
-    }
-    if (s == "autoRescanTestChannel") {
-        return ScanPurpose::AutoRescanTestChannel;
-    }
-    return ScanPurpose::None;
-}
-*/
-
 
 void RoamingWiFiManager::printMAC() {
     uint8_t mac[6];
@@ -79,13 +58,12 @@ RoamingWiFiManager::RoamingWiFiManager(int port) : server(port) {
 
 
 void RoamingWiFiManager::loadScanSettings() {
-    // New settings (preferred)
     const bool hasAutoFullEn = wifiPrefs.isKey("autoFullEn");
     const bool hasAutoFullInt = wifiPrefs.isKey("autoFullIntSecF");
     const bool hasAutoRescanEn = wifiPrefs.isKey("autoRescanEn");
     const bool hasAutoRescanInt = wifiPrefs.isKey("autoRescIntSecF");
 
-    // If new keys exist, use them. Otherwise, use defaults.
+    // If keys exist, use them. Otherwise, use defaults.
     if (!hasAutoFullEn) {
         wifiPrefs.putBool("autoFullEn", false);
     }
@@ -184,7 +162,6 @@ void RoamingWiFiManager::loadNetworkInfo() {
     savedSSID = wifiPrefs.getString("savedSsid", "");
     savedBSSID = wifiPrefs.getString("savedBssid", "");
     savedChannel = wifiPrefs.getInt("savedChan", 0);
-
     // Only attempt fast reconnect if this flag was true on the previous boot.
     lastQuickReconnectSuccess = wifiPrefs.getBool("lastQuickOK", false);
 }
@@ -218,7 +195,7 @@ bool RoamingWiFiManager::loadPersistedSettings() {
 
 
 void RoamingWiFiManager::init(std::vector<NetworkCredentials> credentials, String bssidAliasesUrl, String adminUser, String adminPassword) {
-    LED(50, 0, 0); // Bright red
+    LED(50, 50, 50); // White
 
     this->bssidAliasesUrl = bssidAliasesUrl;
     _adminUser = adminUser;
@@ -320,6 +297,7 @@ void RoamingWiFiManager::init(std::vector<NetworkCredentials> credentials, Strin
         }
         LED(0, 0, 50); // Blue for processing scan results
         copyScannedNetworksToList(false);
+        printNetworks();
 
         lastNetworksScanType = "full";
 
@@ -336,11 +314,9 @@ void RoamingWiFiManager::init(std::vector<NetworkCredentials> credentials, Strin
     setupWebServer();
 
     if (WiFi.isConnected()) {
-        LED(0, 5, 0); // Dark green for connected
-        // Setup web server after connection attempts
+        LED(0, 10, 0); // Green for connected
     } else {
         LED(10, 0, 0); // Red for not connected
-        //DBG_PRINTLN_L(1,"WiFi: Not connected; cannot start webserver.");
     }
 }
 
@@ -420,14 +396,13 @@ bool RoamingWiFiManager::connectDirectSaved() {
             DBG_PRINTLN_L(1,"WiFi: Fast reconnect succeeded!");
             DBG_PRINTF_L(1,"IP Address: %s\n", WiFi.localIP().toString().c_str());
             DBG_PRINTF_L(1,"AP BSSID: %s  Channel: %d  RSSI: %d dBm\n", WiFi.BSSIDstr().c_str(), WiFi.channel(), WiFi.RSSI());
-            LED(0, 10, 0);
+            LED(0, 10, 0); // Green, connected
             persistConnectedNetwork();
             return true;
         }
     }
-
     DBG_PRINTLN_L(1,"WiFi: Fast reconnect failed.");
-    LED(10, 5, 0);
+    LED(10, 0, 0); // Red, not connected
     return false;
 }
 
@@ -633,13 +608,13 @@ void RoamingWiFiManager::sortNetworks() {
 
 void RoamingWiFiManager::printNetworks() {
     if (scannedNetworkList.empty()) {
-        DBG_PRINTLN_L(3,"printNetworks: No scanned networks available.");
+        DBG_PRINTLN_L(1,"printNetworks: No scanned networks available.");
         return;
     }
 
-    DBG_PRINTLN_L(3,"WiFi networks:");
+    DBG_PRINTLN_L(1,"WiFi networks:");
     for (const auto& net : scannedNetworkList) {
-        DBG_PRINTF_L(4,"SSID: %s, BSSID: %s, RSSI: %d, Channel: %d, %s\n",
+        DBG_PRINTF_L(1,"SSID: %s, BSSID: %s, RSSI: %d, Channel: %d, %s\n",
                       net.ssid.c_str(),
                       net.bssid.c_str(),
                       net.rssi,
@@ -728,11 +703,11 @@ void RoamingWiFiManager::connectToStrongestNetwork() {
         DBG_PRINTF_L(1,"Station MAC: %s\n", WiFi.macAddress().c_str());
         DBG_PRINTF_L(1,"AP BSSID: %s  Channel: %d  RSSI: %d dBm\n", WiFi.BSSIDstr().c_str(), WiFi.channel(), WiFi.RSSI());
         // Set LED to green when connected
-        LED(0, 5, 0); // Dark green for connected
+        LED(0, 10, 0); // Green for connected
     } else {
         DBG_PRINTLN_L(1,"WiFi: Connection failed!");
-        // Keep LED orange for failed connection
-        LED(10, 5, 0); // Orange for connection failed
+        // Keep LED red for failed connection
+        LED(10, 0, 0); // Red for connection failed
     }
     lastConnectAttemptTime = millis();
 }
@@ -793,10 +768,10 @@ void RoamingWiFiManager::connectToTargetNetwork(const String& ssid, const String
         DBG_PRINTF_L(1,"IP Address: %s\n", WiFi.localIP().toString().c_str());
         DBG_PRINTF_L(1,"Station MAC: %s\n", WiFi.macAddress().c_str());
         DBG_PRINTF_L(1,"AP BSSID: %s  Channel: %d  RSSI: %d dBm\n", WiFi.BSSIDstr().c_str(), WiFi.channel(), WiFi.RSSI());
-        LED(0, 5, 0); // Dark green for connected
+        LED(0, 10, 0); // Green for connected
     } else {
         DBG_PRINTLN_L(1,"WiFi: Connection failed!");
-        LED(10, 5, 0); // Orange for connection failed
+        LED(10, 0, 0); // Red for connection failed
     }
     lastConnectAttemptTime = millis();
 }
@@ -1399,9 +1374,9 @@ void RoamingWiFiManager::setupMainEndpoint() {
         }
     });    
     
-    server.onNotFound([](AsyncWebServerRequest *request) {
+    server.onNotFound([this](AsyncWebServerRequest *request) {
         DBG_PRINTF_L(2,"WiFi: 404 Not Found: %s\n", request->url().c_str());
-        request->send(404, "text/plain", "Not found");
+        request->send(404, "text/plain", "URL '" + request->url() + "' not found. Go to /wifi for admin panel.");
     });
 }
 
