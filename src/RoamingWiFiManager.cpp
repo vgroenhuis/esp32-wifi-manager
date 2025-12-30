@@ -12,9 +12,9 @@
 
 // Waveshare ESP32-C5 RGB LED wiring is reversed
 #ifdef RED_GREEN_REVERSED
-#define LED(R, G, B) rgbLedWrite(RGB_BUILTIN, G, R, B)
+#define LED(R, G, B) if (RoamingWiFiManager::useLEDIndicator) { rgbLedWrite(RGB_BUILTIN, G, R, B); }
 #else
-#define LED(R, G, B) rgbLedWrite(RGB_BUILTIN, R, G, B)
+#define LED(R, G, B) if (RoamingWiFiManager::useLEDIndicator) { rgbLedWrite(RGB_BUILTIN, R, G, B); }
 #endif
 
 
@@ -1972,4 +1972,10 @@ void RoamingWiFiManager::loop() {
 
 String RoamingWiFiManager::serverHtml() {        
     return WIFI_HTML; // defined in wifi.html
+}
+
+bool RoamingWiFiManager::useLEDIndicator = true;
+
+void RoamingWiFiManager::setUseLEDIndicator(bool enable) {
+    useLEDIndicator = enable;
 }

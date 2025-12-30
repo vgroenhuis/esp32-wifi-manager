@@ -32,11 +32,18 @@ class RoamingWiFiManager {
         // Reads MAC address from wifi chip and prints it to Serial. Also sets mode to STA and 5GHz.
         static void printMAC();
 
+        // By default the manager controls the LED. Disable it to control it yourself.
+        static void setUseLEDIndicator(bool enable);
+
         // Constructor. serverPort: port number for the web server (default 80).
         RoamingWiFiManager(int serverPort=80);
 
         // Initializes the RoamingWiFiManager with known networks, optional BSSID alias URL, and optional admin credentials.
         void init(std::vector<NetworkCredentials> knownCredentials, String bssidAliasesUrl = "", String adminUser="", String adminPassword="");
+
+        bool isConnected() {
+            return (WiFi.status() == WL_CONNECTED);
+        }
 
         // Main loop function to be called regularly, to handle async scanning, auto-reconnects and such
         void loop();
@@ -99,6 +106,7 @@ class RoamingWiFiManager {
         unsigned long lastNetworksScanTime = 0; // when the visible networks list was last updated from a scan (ms)
         unsigned long lastAutoReconnectAttemptTime = 0; // last auto-reconnect attempt time (ms)
 
+        static bool useLEDIndicator; // if true, use built-in LED to indicate status
         uint32_t networkScanCount = 0; // number of completed full scans (and completed rescan sweeps) since boot
 
         // How the current scannedNetworkList was produced.

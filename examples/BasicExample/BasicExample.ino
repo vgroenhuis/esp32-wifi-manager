@@ -2,7 +2,12 @@
 
 RoamingWiFiManager manager;
 
-const std::vector<NetworkCredentials> knownNetworks = {{"PhoneHotspot", "asdf1234"}, {"iotroam", "passroam"}};
+#ifndef WIFI_SSID
+#define WIFI_SSID "your-ssid"
+#define WIFI_PASSWORD "your-password"
+#endif
+
+const std::vector<NetworkCredentials> knownNetworks = {{WIFI_SSID,WIFI_PASSWORD},{"PhoneHotspot", "asdf1234"}, {"iotroam", "passroam"}};
 const String adminUser = "admin";
 const String adminPassword = "whatever"; // leave blank for no authentication
 const String aliasUrl = "https://raw.githubusercontent.com/vgroenhuis/roaming-wifi-manager/refs/heads/main/aliases/bssid_info.json";
