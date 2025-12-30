@@ -20,7 +20,7 @@
   "license": "",
   "homepage": "",
   "dependencies": {
-    "esp32async/ESPAsyncWebServer": "*",
+    "ESP32Async/ESPAsyncWebServer": "*",
     "bblanchon/ArduinoJson": "*"
   },
   "frameworks": "Arduino",

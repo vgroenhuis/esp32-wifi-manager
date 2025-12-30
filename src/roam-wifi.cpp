@@ -2,7 +2,8 @@
 #include <WiFi.h>
 #include <algorithm>
 #include <mbedtls/base64.h>
-#include "wifi.html"
+
+#include "wifi.html" // contains the WIFI_HTML string
 
 // Runtime debug level control
 #define DBG_PRINT_L(minLevel, ...)  if (RoamingWiFiManager::debugLevel >= (minLevel)) { Serial.print(__VA_ARGS__); }
@@ -216,7 +217,7 @@ bool RoamingWiFiManager::loadPersistedSettings() {
 }
 
 
-void RoamingWiFiManager::init(std::vector<KnownNetworkCredentials> credentials, String bssidAliasesUrl, String adminUser, String adminPassword) {
+void RoamingWiFiManager::init(std::vector<NetworkCredentials> credentials, String bssidAliasesUrl, String adminUser, String adminPassword) {
     LED(50, 0, 0); // Bright red
 
     this->bssidAliasesUrl = bssidAliasesUrl;
@@ -600,7 +601,7 @@ void RoamingWiFiManager::sortNetworks() {
         }
 
         bool isKnown = false;
-        for (const KnownNetworkCredentials& known : knownNetworks) {
+        for (const NetworkCredentials& known : knownNetworks) {
             if (net.ssid.equals(known.ssid)) {
                 isKnown = true;
                 break;
@@ -1468,7 +1469,7 @@ String RoamingWiFiManager::getWiFiStatus() {
 }
 
 String RoamingWiFiManager::getPasswordOfNetwork(String ssid) {
-    for (const KnownNetworkCredentials& net : knownNetworks) {
+    for (const NetworkCredentials& net : knownNetworks) {
         if (net.ssid.equals(ssid)) {
             return net.password;
         }
@@ -1516,7 +1517,7 @@ bool RoamingWiFiManager::isKnownSsid(const String& ssid) {
     if (ssid.length() == 0) {
         return false;
     }
-    for (const KnownNetworkCredentials& net : knownNetworks) {
+    for (const NetworkCredentials& net : knownNetworks) {
         if (net.ssid.equals(ssid)) {
             return true;
         }
@@ -1821,7 +1822,7 @@ bool RoamingWiFiManager::handleAsyncScanCompletion() {
     // scanResult >= 0 : number of networks found
     if (scanPurpose == ScanPurpose::AutoRescanSingle) {
         if (scanResult == 0) {
-            DBG_PRINTLN_L(2,"WiFi: Auto-rescan: no networks found in scan.");
+            DBG_PRINTLN_L(4,"WiFi: Auto-rescan: no networks found in scan.");
             WiFi.scanDelete();
             if (autoRescanActive) {
                 if (autoRescanIndex < scannedNetworkList.size()) {
@@ -1994,3 +1995,6 @@ void RoamingWiFiManager::loop() {
     handleAsyncScanCompletion();
 }
 
+String RoamingWiFiManager::serverHtml() {        
+    return WIFI_HTML; // defined in wifi.html
+}

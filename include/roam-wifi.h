@@ -5,7 +5,7 @@
 #include <Preferences.h>
 #include <vector>
 
-class KnownNetworkCredentials {
+class NetworkCredentials {
 public:
     String ssid;
     String password;
@@ -36,7 +36,7 @@ class RoamingWiFiManager {
         RoamingWiFiManager(int serverPort=80);
 
         // Initializes the RoamingWiFiManager with known networks, optional BSSID alias URL, and optional admin credentials.
-        void init(std::vector<KnownNetworkCredentials> knownCredentials, String bssidAliasesUrl = "", String adminUser="", String adminPassword="");
+        void init(std::vector<NetworkCredentials> knownCredentials, String bssidAliasesUrl = "", String adminUser="", String adminPassword="");
 
         // Main loop function to be called regularly, to handle async scanning, auto-reconnects and such
         void loop();
@@ -82,7 +82,7 @@ class RoamingWiFiManager {
         void setupMainEndpoint();
 
         // timestamps are all in ms
-        std::vector<KnownNetworkCredentials> knownNetworks; // known networks to try connecting to
+        std::vector<NetworkCredentials> knownNetworks; // known networks to try connecting to
         std::vector<ScannedNetwork> scannedNetworkList; // scanned networks from last scan
         std::vector<String> _clientIpAddresses; // list of assigned IP addresses, to help finding the unknown client IP for a specific network
 
