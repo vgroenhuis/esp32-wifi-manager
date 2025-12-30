@@ -225,6 +225,7 @@ void RoamingWiFiManager::init(std::vector<NetworkCredentials> credentials, Strin
     DBG_PRINTF_L(2,"WiFi: Station MAC: %s\n", stationMac.c_str());
 
     const bool persistedSettingsLoaded = loadPersistedSettings();
+    wifiPrefs.putBool("lastQuickOK", false); // on next startup it will be false, unless we manage to quick connect
 
     bool fastPathUsed = false;
 
@@ -236,7 +237,6 @@ void RoamingWiFiManager::init(std::vector<NetworkCredentials> credentials, Strin
             const bool ok = connectDirectSaved();
             if (!ok) {
                 lastQuickReconnectSuccess = false;
-                wifiPrefs.putBool("lastQuickOK", false);
             }
         } else {
             DBG_PRINTF_L(2,"WiFi: Saved SSID '%s' not in known networks; skipping fast reconnect.\n", savedSSID.c_str());
