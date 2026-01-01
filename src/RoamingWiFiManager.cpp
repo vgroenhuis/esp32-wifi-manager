@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <mbedtls/base64.h>
 
-#include "WiFiPage.html" // contains the WIFI_HTML string
+#include "../assets/WiFiPage.html" // contains the WIFI_HTML string
 
 // Runtime debug level control
 #define DBG_PRINT_L(minLevel, ...)  if (RoamingWiFiManager::debugLevel >= (minLevel)) { Serial.print(__VA_ARGS__); }
