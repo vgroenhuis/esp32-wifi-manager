@@ -325,7 +325,7 @@ void RoamingWiFiManager::init(std::vector<NetworkCredentials> credentials, std::
         } else {
             DBG_PRINTLN_L(2,"WiFi: No saved connection info; performing initial scan...");
         }
-        LED(80, 10, 0); // Orange for scanning
+        LED(80, 10, 0); // Orange for scanning sync
         WiFi.disconnect(false);
         delay(500); // pause just to be sure
         int n = WiFi.scanNetworks();
@@ -423,6 +423,7 @@ bool RoamingWiFiManager::connectDirectSaved() {
     while (WiFi.status() != WL_CONNECTED && (millis() - startMs < 5000) && !stationDisconnected) {
         delay(100);
         DBG_PRINT_L(4,".");
+        // Blinking orange while attempting fast reconnect
         if (attempts % 2 == 0) {
             LED(40, 4, 0); // Orange
         } else {
@@ -759,6 +760,7 @@ void RoamingWiFiManager::connectToStrongestNetwork() {
     while (WiFi.status() != WL_CONNECTED && (millis()-startTimeMs < 5000)) {
         delay(100);
         DBG_PRINT_L(4,".");
+        // Blinking orange
         if (attempts%2==0) {
             LED(40, 4, 0); // Orange
         } else {
@@ -826,6 +828,7 @@ void RoamingWiFiManager::connectToTargetNetwork(const String& ssid, const String
     while (WiFi.status() != WL_CONNECTED && (millis() - startTimeMs < 5000)) {
         delay(100);
         DBG_PRINT_L(4,".");
+        // Blinking orange
         if (attempts % 2 == 0) {
             LED(40, 4, 0); // Orange
         } else {
@@ -1580,6 +1583,7 @@ void RoamingWiFiManager::scanNetworksFullAsync() {
     if (!scanInProgress) {
         scanInProgress = true;
         WiFi.scanNetworks(true); // Async scan (all channels)
+        LED(25, 0, 50); // magenta: scan in progress
     } else {
         DBG_PRINTLN_L(2,"WiFi: Scan already in progress; cannot start another.");
     }
@@ -1596,6 +1600,7 @@ void RoamingWiFiManager::scanNetworkAsync(uint8_t channel, const uint8_t* bssid)
     // Scan one channel only, a specific BSSID (may be null).
     // max_ms_per_chan kept short; we just want a quick refresh.
     WiFi.scanNetworks(true, true, false, 300, channel, nullptr, bssid);
+    LED(25, 0, 50); // magenta: scan in progress
 }
 
 static bool parseBssidStr(const String& bssidStr, uint8_t outBssid[6]) {
@@ -1907,6 +1912,11 @@ bool RoamingWiFiManager::handleAsyncScanCompletion() {
     }
 
     const int scanResult = WiFi.scanComplete();
+    if (WiFi.isConnected()) {
+        LED(0, 10, 0); // green: connected
+    } else {
+        LED(50, 0, 0); // red: not connected
+    }
     DBG_PRINTF_L(3,"WiFi: Async scan completed. scanPurpose=%s scanResult=%d\n", toString(scanPurpose).c_str(), scanResult);
     scanInProgress = false;
 
@@ -2095,7 +2105,7 @@ void RoamingWiFiManager::loop() {
     // When connected, optionally roam to a stronger network if enabled
     handleAutoRoaming();
     if (WiFi.status() == WL_CONNECTED) {
-        // Auto-roaming triggered a connection attempt; return to allow it to proceed
+        // Within one second of last connect attempt, skip further processing
         if (lastConnectAttemptTime != 0 && (millis() - lastConnectAttemptTime) < 1000) {
             return;
         }
